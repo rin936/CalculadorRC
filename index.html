@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calculadora RC do Sandro</title>
+    <style>
+        /* 基础重置：消除默认间距 */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* 让容器占满全屏 */
+        .vbox {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            min-height: 100vh; /* 至少占满整个屏幕高度 */
+            padding: 20px;
+            gap: 15px;
+            background-color: #ffffff;
+        }
+
+        h3 { 
+            margin: 10px 0 20px 0; 
+            color: #1a73e8; 
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+        }
+
+        .label-bold { 
+            font-weight: 600; 
+            color: #3c4043;
+            font-size: 1rem;
+        }
+
+        /* 优化移动端输入框：更大的点击区域 */
+        input[type="number"] {
+            width: 120px;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input[type="number"]:focus {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+
+        /* 复选框样式 */
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .results {
+            margin-top: auto; /* 将结果推到底部或跟随内容 */
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #f8f9fa;
+            border: 1px solid #e8eaed;
+        }
+
+        .result-item {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .val-text {
+            color: #1a73e8;
+            font-weight: bold;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        button:active {
+            background-color: #174ea6;
+            transform: scale(0.98);
+        }
+
+        hr { border: 0; border-top: 1px solid #ddd; margin: 15px 0; }
+    </style>
+</head>
+<body>
+
+<div class="vbox">
+    <h3>Calculadora RC</h3>
+    
+    <div class="input-group">
+        <label class="label-bold">Modo: Passa-Baixa</label>
+        <input type="checkbox" id="filtro" checked>
+    </div>
+
+    <div class="input-group">
+        <label class="label-bold">Resistência (Ω):</label>
+        <input type="number" id="res" value="1000" step="0.01">
+    </div>
+
+    <div class="input-group">
+        <label class="label-bold">Frequência (Hz):</label>
+        <input type="number" id="freq" value="1000">
+    </div>
+
+    <div class="input-group">
+        <label class="label-bold">Capacitância (nF):</label>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="number" id="cap" value="0" step="0.01">
+            <input type="checkbox" id="nano" checked style="display:none"> </div>
+    </div>
+
+    <div class="input-group">
+        <label class="label-bold">Vi (V):</label>
+        <input type="number" id="vi" value="5">
+    </div>
+
+    <div class="input-group">
+        <label class="label-bold">Vo Medido (V):</label>
+        <input type="number" id="vo" value="5" step="0.001">
+    </div>
+
+    <button id="calculateBtn">CALCULAR</button>
+
+    <div class="results">
+        <div class="result-item"><span>Xc:</span> <span id="xc_val" class="val-text">--</span></div>
+        <div class="result-item"><span>Vout Teórica:</span> <span id="tens_val" class="val-text">--</span></div>
+        <div class="result-item"><span>Ângulo:</span> <span id="ang_val" class="val-text">--</span></div>
+        <hr>
+        <div class="result-item"><span>Vo/Vi (Razão):</span> <span id="vovi_val" class="val-text">--</span></div>
+        <div class="result-item"><span>Ganho (dB):</span> <span id="vovidb_val" class="val-text">--</span></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('calculateBtn').addEventListener('click', update);
+
+    function update() {
+        const isLPF = document.getElementById('filtro').checked;
+        const R = parseFloat(document.getElementById('res').value);
+        const freq = parseFloat(document.getElementById('freq').value);
+        let C = parseFloat(document.getElementById('cap').value) / 1e9; // 直接按nF算
+        const Vi = parseFloat(document.getElementById('vi').value);
+        const Vo_med = parseFloat(document.getElementById('vo').value);
+
+        const Xc = 1 / (2 * Math.PI * freq * C);
+        const denominator = Math.sqrt(R * R + Xc * Xc);
+        
+        let v_out_theo, phase_deg;
+
+        if (isLPF) {
+            v_out_theo = Vi * (Xc / denominator);
+            phase_deg = -Math.atan2(R, Xc) * (180 / Math.PI);
+        } else {
+            v_out_theo = Vi * (R / denominator);
+            phase_deg = Math.atan2(Xc, R) * (180 / Math.PI);
+        }
+
+        const gain_ratio = Vo_med / Vi;
+        const gain_db = 20 * Math.log10(gain_ratio);
+
+        document.getElementById('xc_val').innerText = Xc.toFixed(2) + " Ω";
+        document.getElementById('tens_val').innerText = v_out_theo.toFixed(4) + " V";
+        document.getElementById('ang_val').innerText = phase_deg.toFixed(2) + "°";
+        document.getElementById('vovi_val').innerText = gain_ratio.toFixed(4);
+        document.getElementById('vovidb_val').innerText = gain_db.toFixed(2);
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calculadora do Sandro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="vbox">
+        <h3>Calculadora</h3>
+        <div class="input-group">
+            <label class="label-bold">Resistência (Ω):</label>
+            <input type="number" id="res" value="1000" step="0.01">
+        </div>
+
+        <div class="input-group">
+            <label class="label-bold">Frequência (Hz):</label>
+            <input type="number" id="freq" value="1000">
+        </div>
+
+        <div class="input-group">
+            <label class="label-bold">Capacitor (nF):</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" id="cap" value="0" step="0.01">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label class="label-bold">Indutor (mH):</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" id="ind" value="0" step="0.01"> 
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label class="label-bold">Vo Medido (V):</label>
+            <input type="number" id="vo" value="5" step="0.001">
+        </div>
+        <div class="input-group">
+            <label class="label-bold">Vi (V):</label>
+            <input type="number" id="vi" value="0.5" step="0.001">
+        </div>
+        <button id="calculateBtn">CALCULAR</button>
+        <div class="results">
+            <div class="result-item"><span>Xc:</span> <span id="xc_val" class="val-text">--</span></div>
+            <div class="result-item"><span>Xl:</span> <span id="xl_val" class="val-text">--</span></div>
+            <hr>
+            <div class="result-item"><span>Ângulo Vout Calculado:</span> <span id="ang_vout" class="val-text">--</span></div>
+            <div class="result-item"><span>Vout Calculado:</span> <span id="vout" class="val-text">--</span></div>
+            <hr>
+            <h4>(Do Vo medido)</h4>
+            <div class="result-item"><span>Vo/Vi (Razão):</span> <span id="vovi_val" class="val-text">--</span></div>
+            <div class="result-item"><span>Ganho (dB):</span> <span id="vovidb_val" class="val-text">--</span></div>
+            <hr>
+            <h4>(Do Vo Calculado)</h4>
+            <div class="result-item"><span>Vo/Vi (Razão):</span> <span id="cvovi_val" class="val-text">--</span></div>
+            <div class="result-item"><span>Ganho (dB):</span> <span id="cvovidb_val" class="val-text">--</span></div>
+        </div>
+    </div>
+    <script>
+        document.getElementById("calculateBtn").addEventListener('click',update);
+        function update(){
+            const VIN = parseFloat(document.getElementById("vi").value);
+            const res = parseFloat(document.getElementById("res").value);
+            const freq = parseFloat(document.getElementById("freq").value);
+            const cap = parseFloat(document.getElementById("cap").value)/1e9;
+            const ind = parseFloat(document.getElementById("ind").value)/1e3;
+            const vo = parseFloat(document.getElementById("vo").value);
+
+            const Xc = 1/(2*Math.PI*freq*cap);
+            const Xl = (2*Math.PI*freq*ind);
+
+            const real = Xc*Xl;
+            const complexo = (Xl-Xc)*res;
+            const modulo = Math.hypot(real,complexo);
+            const vo_val = ((Xc*Xl)/modulo)*VIN;
+            const angulo = -Math.atan2(complexo,real)*180/Math.PI;
+            
+            const gain_ratio = vo / VIN;
+            const gain_db = 20 * Math.log10(gain_ratio);
+            const cgain_ratio = vo_val / VIN;
+            const cgain_db = 20 * Math.log10(cgain_ratio);
+            console.log(Xc)
+            document.getElementById('xc_val').innerText = Xc.toFixed(2) + " Ω";
+            document.getElementById('xl_val').innerText = Xl.toFixed(2) + " Ω";
+            document.getElementById('vout').innerText = vo_val.toExponential(3) + " V";
+            document.getElementById('ang_vout').innerText = angulo.toFixed(2) + "°";
+            document.getElementById('vovi_val').innerText = gain_ratio.toFixed(5);
+            document.getElementById('vovidb_val').innerText = gain_db.toFixed(2);
+            document.getElementById('cvovi_val').innerText = cgain_ratio.toFixed(5);
+            document.getElementById('cvovidb_val').innerText = cgain_db.toFixed(2);
+        }
+    </script>
+</body>
+</html>

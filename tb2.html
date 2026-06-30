@@ -82,7 +82,7 @@
             const cgain_ratio = vo_val / VIN;
             const cgain_db = 20 * Math.log10(cgain_ratio);
             console.log(Xc)
-            document.getElementById('xc_val').innerText = Xc.toFixed(2) + " Ω";
+            document.getElementById('xc_val').innerText = Xc.toFixed(6) + " Ω";
             document.getElementById('xl_val').innerText = Xl.toFixed(2) + " Ω";
             document.getElementById('vout').innerText = vo_val.toExponential(3) + " V";
             document.getElementById('ang_vout').innerText = angulo.toFixed(2) + "°";

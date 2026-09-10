@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Testador de Matriz de LED</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #05070a;
+    --panel: #10151c;
+    --panel-2: #0c1016;
+    --border: #1f2833;
+    --border-soft: #182028;
+    --led-off: #2a1210;
+    --led-off-ring: #3a1a16;
+    --led-on: #ff2b1f;
+    --led-on-core: #ffddcc;
+    --amber: #ffb020;
+    --text: #e8e2d8;
+    --muted: #7a8290;
+    --muted-2: #4d5561;
+    --danger: #ff6b5b;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  body{
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(255,43,31,0.04), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(255,176,32,0.03), transparent 40%);
+    padding: 28px 20px 60px;
+  }
+
+  .wrap{
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header{
+    display:flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-wrap: wrap;
+  }
+
+  header h1{
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 0;
+    color: var(--text);
+  }
+
+  header h1 span{
+    color: var(--muted-2);
+    font-weight: 500;
+  }
+
+  header .tag{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    border: 1px solid var(--border);
+    padding: 4px 9px;
+    border-radius: 3px;
+    background: var(--panel-2);
+  }
+
+  .board{
+    display: grid;
+    grid-template-columns: minmax(280px, 460px) 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 780px){
+    .board{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px;
+  }
+
+  .panel-label{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px 0;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+
+  .panel-label::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background: var(--border-soft);
+  }
+
+  /* ---- dimension controls ---- */
+  .dims{
+    display:flex;
+    align-items:flex-end;
+    gap:10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .field label{
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  input[type=number]{
+    width: 72px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    padding: 7px 8px;
+    border-radius: 4px;
+    outline: none;
+  }
+  input[type=number]:focus{ border-color: var(--amber); }
+
+  .x-sep{ color: var(--muted-2); font-family:'IBM Plex Mono',monospace; padding-bottom: 8px; }
+
+  button{
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  button:hover{ border-color: var(--muted-2); }
+  button:active{ transform: translateY(1px); }
+  button:disabled{ opacity: .35; cursor: not-allowed; }
+
+  button.primary{
+    background: linear-gradient(180deg, #ff3a2b, #d81f13);
+    border-color: #7a120b;
+    color: #fff2ef;
+  }
+  button.primary:hover{ filter: brightness(1.08); }
+
+  button.ghost{
+    background: transparent;
+  }
+
+  /* ---- LED grid ---- */
+  .grid-stage{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 14px;
+  }
+
+  .bezel{
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.45);
+    display:flex;
+    gap: 8px;
+  }
+
+  .ruler-col{
+    display:flex;
+    flex-direction:column;
+    justify-content: flex-end;
+    align-items:flex-end;
+    padding-right: 4px;
+  }
+  .ruler-row-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size: 9px;
+    color: var(--muted-2);
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+  }
+
+  .grid-col-wrap{ display:flex; flex-direction:column; gap:4px; }
+
+  .ruler-row{
+    display:grid;
+    gap: var(--gap, 4px);
+  }
+  .ruler-row-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size: 9px;
+    color: var(--muted-2);
+    text-align:center;
+  }
+
+  #ledGrid{
+    display:grid;
+    gap: var(--gap, 4px);
+  }
+
+  .led{
+    background: radial-gradient(circle at 35% 32%, #3a1815, var(--led-off) 70%);
+    border: 1px solid var(--led-off-ring);
+    border-radius: 3px;
+    box-shadow: inset 0 0 3px rgba(0,0,0,0.6);
+  }
+
+  .led.on{
+    background: radial-gradient(circle at 35% 32%, #ffe3a8, var(--led-on) 55%, #b30f06 100%);
+    border-color: #ff6a52;
+    box-shadow: 0 0 8px 1px rgba(255,60,30,0.75), 0 0 2px rgba(255,150,100,0.9), inset 0 0 4px rgba(255,255,255,0.25);
+  }
+
+  .frame-status{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .frame-status b{ color: var(--amber); font-weight:600; }
+
+  .transport{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content:center;
+  }
+
+  .transport button{ min-width: 42px; }
+
+  /* ---- speed ---- */
+  .speed-row{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .speed-row label{
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space:nowrap;
+  }
+  input[type=range]{
+    flex:1;
+    accent-color: var(--amber);
+  }
+  .speed-val{
+    font-family:'IBM Plex Mono',monospace;
+    font-size: 12px;
+    color: var(--amber);
+    min-width: 58px;
+    text-align:right;
+  }
+
+  /* ---- counter mode ---- */
+  .counter-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-soft);
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .counter-row label{
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    display:flex;
+    align-items:center;
+    gap: 6px;
+    white-space:nowrap;
+  }
+  .counter-row input[type=checkbox]{
+    width: 14px; height: 14px;
+    accent-color: var(--amber);
+  }
+  .counter-row input[type=number]{ width: 60px; }
+  .counter-row input[type=text]{
+    width: 110px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    outline: none;
+  }
+  .counter-row input[type=text]:focus{ border-color: var(--amber); }
+  .counter-extra{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .counter-extra.is-hidden{ display:none; }
+
+  /* ---- custom template ---- */
+  .template-row{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-bottom: 12px;
+  }
+  .template-row.is-hidden{ display:none; }
+  .template-row-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .template-row label{
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space:nowrap;
+  }
+  #templateInput{
+    flex:1;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: #ffd9c9;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: 4px;
+    outline: none;
+  }
+  #templateInput:focus{ border-color: var(--amber); }
+  .template-hint{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted-2);
+  }
+
+  /* ---- editor ---- */
+  textarea{
+    width: 100%;
+    min-height: 260px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: #ffd9c9;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    padding: 12px 14px;
+    border-radius: 5px;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+  }
+  textarea:focus{ border-color: var(--amber); }
+
+  .editor-actions{
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+    margin-top: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .editor-actions .left{ display:flex; gap:8px; }
+
+  .help{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-2);
+    line-height:1.7;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .help b{ color: var(--muted); font-weight:600; }
+
+  .errors{
+    margin-top: 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--danger);
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+  .errors:empty{ display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Testador de Matriz de LED <span>/ matrix tester</span></h1>
+    <div class="tag">PADRÃO 5×7</div>
+  </header>
+
+  <div class="board">
+
+    <!-- LEFT: display -->
+    <div class="panel">
+      <p class="panel-label">Área de exibição</p>
+
+      <div class="dims">
+        <div class="field">
+          <label for="colsInput">Largura (colunas)</label>
+          <input type="number" id="colsInput" min="1" max="32" value="5">
+        </div>
+        <div class="x-sep">×</div>
+        <div class="field">
+          <label for="rowsInput">Altura (linhas)</label>
+          <input type="number" id="rowsInput" min="1" max="32" value="7">
+        </div>
+        <button id="applyDims">Aplicar dimensões</button>
+      </div>
+
+      <div class="grid-stage">
+        <div class="bezel">
+          <div id="ledGrid"></div>
+        </div>
+
+        <div class="frame-status" id="frameStatus">quadro 0 / 0</div>
+
+        <div class="transport">
+          <button id="btnPrev" title="Quadro anterior">◀</button>
+          <button id="btnPlay" class="primary" title="Reproduzir/pausar">▶ Reproduzir</button>
+          <button id="btnNext" title="Próximo quadro">▶</button>
+          <button id="btnStop" class="ghost" title="Parar e voltar ao primeiro quadro">■ Parar</button>
+        </div>
+
+        <div class="speed-row" style="width:100%">
+          <label for="speedRange">Intervalo de reprodução</label>
+          <input type="range" id="speedRange" min="50" max="2000" step="50" value="500">
+          <div class="speed-val" id="speedVal">500 ms</div>
+        </div>
+
+        <div class="counter-row">
+          <label><input type="checkbox" id="counterToggle"> Ativar modo de script com counter</label>
+          <div class="counter-extra is-hidden" id="counterExtra">
+            <label>Contar até <input type="number" id="counterMax" min="0" max="999" value="10"></label>
+            <label><input type="checkbox" id="counterLoop" checked> Repetir ao final</label>
+            <label>Nome da função <input type="text" id="counterFuncName" value="ligar" spellcheck="false"></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: editor -->
+    <div class="panel">
+      <p class="panel-label">Script da matriz</p>
+
+      <div class="template-row" id="templateRow">
+        <div class="template-row-top">
+          <label for="templateInput">Modelo de sintaxe</label>
+          <input type="text" id="templateInput" value="ligar(%l, %c);" spellcheck="false">
+          <button id="templateReset" class="ghost" title="Voltar ao modelo padrão">Padrão</button>
+        </div>
+        <div class="template-hint">Use %l para a linha e %c para a coluna — ex.: L(%l);C(%c);</div>
+      </div>
+
+      <textarea id="script" spellcheck="false"></textarea>
+
+      <div class="editor-actions">
+        <div class="left">
+          <button id="btnParse" class="primary">Executar / Analisar</button>
+          <button id="btnExample" class="ghost">Carregar exemplo</button>
+          <button id="btnClear" class="ghost">Limpar</button>
+        </div>
+        <div class="frame-status" id="frameCount">0 quadros no total</div>
+      </div>
+
+      <div class="errors" id="errBox"></div>
+
+      <div class="help" id="helpBox">
+<b>Sintaxe:</b> uma linha para cada <b>ligar(linha, coluna);</b> (ou o modelo que você definir acima). Pode escrever várias linhas no mesmo quadro; linha e coluna começam em 1.<br>
+<b>Modelo personalizado:</b> mude o campo "Modelo de sintaxe" para o formato que preferir, usando %l no lugar da linha e %c no lugar da coluna — por exemplo L(%l);C(%c);<br>
+<b>Trocar de quadro:</b> separe quadros diferentes com uma linha em branco.<br>
+<b>Quadro em branco:</b> escreva <b>CLEAR;</b> sozinho em uma linha para apagar tudo nesse quadro (útil para efeito de piscar).<br>
+<b>Exemplo:</b> para acender a primeira e a segunda luz do canto superior esquerdo, escreva ligar(1, 1); e, na linha seguinte, ligar(1, 2);
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const els = {
+    colsInput: document.getElementById('colsInput'),
+    rowsInput: document.getElementById('rowsInput'),
+    applyDims: document.getElementById('applyDims'),
+    grid: document.getElementById('ledGrid'),
+    frameStatus: document.getElementById('frameStatus'),
+    frameCount: document.getElementById('frameCount'),
+    script: document.getElementById('script'),
+    btnParse: document.getElementById('btnParse'),
+    btnExample: document.getElementById('btnExample'),
+    btnClear: document.getElementById('btnClear'),
+    errBox: document.getElementById('errBox'),
+    btnPrev: document.getElementById('btnPrev'),
+    btnNext: document.getElementById('btnNext'),
+    btnPlay: document.getElementById('btnPlay'),
+    btnStop: document.getElementById('btnStop'),
+    speedRange: document.getElementById('speedRange'),
+    speedVal: document.getElementById('speedVal'),
+    counterToggle: document.getElementById('counterToggle'),
+    counterExtra: document.getElementById('counterExtra'),
+    counterMax: document.getElementById('counterMax'),
+    counterLoop: document.getElementById('counterLoop'),
+    counterFuncName: document.getElementById('counterFuncName'),
+    helpBox: document.getElementById('helpBox'),
+    templateRow: document.getElementById('templateRow'),
+    templateInput: document.getElementById('templateInput'),
+    templateReset: document.getElementById('templateReset'),
+  };
+
+  const DEFAULT_TEMPLATE = 'ligar(%l, %c);';
+
+  const state = {
+    cols: 5,
+    rows: 7,
+    frames: [],      // array of Set("r,c") — index = frame # or counter value
+    current: 0,
+    playing: false,
+    timer: null,
+    template: DEFAULT_TEMPLATE,
+    speed: 500,
+    counterMode: false,
+    counterMax: 10,
+    counterLoop: true,
+    counterFuncName: 'ligar',
+  };
+
+  const EXAMPLE = [
+    'ligar(1, 1);',
+    '',
+    'ligar(2, 2);',
+    '',
+    'ligar(3, 3);',
+    '',
+    'ligar(4, 4);',
+    '',
+    'ligar(5, 5);',
+    '',
+    'CLEAR;',
+  ].join('\n');
+
+  function buildCounterExample(fn){
+    return [
+      '// counter vai de 0 até o limite definido; este script roda de novo a cada passo',
+      'if(counter > 5){',
+      `  ${fn}(5, 4);`,
+      '}',
+      'if(counter % 2 === 0){',
+      `  ${fn}(1, counter % cols + 1);`,
+      '}',
+    ].join('\n');
+  }
+
+  els.script.value = EXAMPLE;
+
+  // ---------- grid rendering ----------
+  function buildGrid(){
+    els.grid.innerHTML = '';
+    const maxDim = Math.max(state.cols, state.rows);
+    const cell = Math.max(10, Math.min(38, Math.floor(420 / maxDim)));
+    const gap = cell < 16 ? 2 : 4;
+    els.grid.style.setProperty('--gap', gap + 'px');
+    els.grid.style.gridTemplateColumns = `repeat(${state.cols}, ${cell}px)`;
+    els.grid.style.gridTemplateRows = `repeat(${state.rows}, ${cell}px)`;
+
+    for(let r = 1; r <= state.rows; r++){
+      for(let c = 1; c <= state.cols; c++){
+        const d = document.createElement('div');
+        d.className = 'led';
+        d.dataset.r = r;
+        d.dataset.c = c;
+        els.grid.appendChild(d);
+      }
+    }
+  }
+
+  function paintFrame(idx){
+    const led = els.grid.children;
+    const on = state.frames[idx] || new Set();
+    for(const cell of led){
+      const key = cell.dataset.r + ',' + cell.dataset.c;
+      cell.classList.toggle('on', on.has(key));
+    }
+    const total = state.frames.length;
+    if(!total){
+      els.frameStatus.innerHTML = state.counterMode ? 'counter 0 / 0' : 'quadro 0 / 0';
+    } else if(state.counterMode){
+      els.frameStatus.innerHTML = `counter <b>${idx}</b> / ${state.counterMax}`;
+    } else {
+      els.frameStatus.innerHTML = `quadro <b>${idx+1}</b> / ${total}`;
+    }
+  }
+
+  // ---------- custom syntax template ----------
+  function escapeRegex(str){
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function buildTemplateMatcher(tpl){
+    if(!tpl || !tpl.trim()){
+      return { error: 'O modelo de sintaxe não pode ficar vazio.' };
+    }
+    const hasL = (tpl.match(/%l/gi) || []).length;
+    const hasC = (tpl.match(/%c/gi) || []).length;
+    if(hasL !== 1 || hasC !== 1){
+      return { error: 'O modelo precisa conter %l e %c, cada um exatamente uma vez.' };
+    }
+    const parts = tpl.split(/(%l|%c)/i);
+    const order = [];
+    let pattern = '';
+    parts.forEach(part => {
+      if(/^%l$/i.test(part)){ order.push('l'); pattern += '(\\d+)'; }
+      else if(/^%c$/i.test(part)){ order.push('c'); pattern += '(\\d+)'; }
+      else { pattern += escapeRegex(part); }
+    });
+    return { pattern, order, error: null };
+  }
+
+  // ---------- parsing ----------
+  function parseScript(text, cols, rows, tpl){
+    const matcher = buildTemplateMatcher(tpl);
+    if(matcher.error){
+      return { frames: [], errors: [matcher.error] };
+    }
+
+    const rawLines = text.split('\n');
+    const errors = [];
+    const blocks = []; // {startLine, lines:[{text,num}]}
+    let cur = null;
+
+    rawLines.forEach((line, i) => {
+      const num = i + 1;
+      const trimmed = line.trim();
+      if(trimmed === ''){
+        if(cur){ blocks.push(cur); cur = null; }
+        return;
+      }
+      if(!cur) cur = { startLine: num, lines: [] };
+      cur.lines.push({ text: trimmed, num });
+    });
+    if(cur) blocks.push(cur);
+
+    const frames = [];
+
+    blocks.forEach(block => {
+      // explicit empty frame
+      if(block.lines.length === 1 && /^clear;?$/i.test(block.lines[0].text)){
+        frames.push(new Set());
+        return;
+      }
+
+      const on = new Set();
+      block.lines.forEach(({text, num}) => {
+        const clean = text.split('//')[0].split('#')[0];
+        const re = new RegExp(matcher.pattern, 'gi');
+        let m;
+        while((m = re.exec(clean)) !== null){
+          const row = parseInt(m[matcher.order.indexOf('l') + 1], 10);
+          const col = parseInt(m[matcher.order.indexOf('c') + 1], 10);
+          if(row < 1 || row > rows || col < 1 || col > cols){
+            errors.push(`Linha ${num}: coordenada (${row}, ${col}) fora do intervalo (atual ${cols}×${rows})`);
+          } else {
+            on.add(row + ',' + col);
+          }
+          if(m.index === re.lastIndex) re.lastIndex++;
+        }
+      });
+
+      if(block.lines.length){
+        frames.push(on);
+      }
+    });
+
+    return { frames, errors };
+  }
+
+  // ---------- counter mode ----------
+  const RESERVED_NAMES = ['counter', 'cols', 'rows'];
+
+  function validFuncName(name){
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !RESERVED_NAMES.includes(name);
+  }
+
+  function buildCounterFrames(text, cols, rows, max, fnName){
+    if(!fnName || !validFuncName(fnName)){
+      return { frames: [], errors: [`Nome de função inválido: "${fnName}". Use um identificador válido (letras, números, _ ou $, sem começar com número) e diferente de counter, cols ou rows.`] };
+    }
+
+    let compiled;
+    try{
+      compiled = new Function('counter', 'cols', 'rows', fnName, text);
+    } catch(e){
+      return { frames: [new Set()], errors: [`Erro de sintaxe no script: ${e.message}`] };
+    }
+
+    const frames = [];
+    const errors = [];
+    for(let i = 0; i <= max; i++){
+      const on = new Set();
+      const fn = (row, col) => {
+        row = Number(row); col = Number(col);
+        if(row >= 1 && row <= rows && col >= 1 && col <= cols){
+          on.add(row + ',' + col);
+        } else if(errors.length < 5){
+          errors.push(`counter=${i}: coordenada ${fnName}(${row}, ${col}); fora do intervalo (atual ${cols}×${rows})`);
+        }
+      };
+      try{
+        compiled(i, cols, rows, fn);
+      } catch(e){
+        if(errors.length < 5) errors.push(`counter=${i}: erro em tempo de execução - ${e.message}`);
+      }
+      frames.push(on);
+    }
+    if(errors.length === 5) errors.push('…mais erros omitidos');
+    return { frames, errors };
+  }
+
+  function runParse(){
+    stopPlayback();
+    let frames, errors;
+    if(state.counterMode){
+      state.counterMax = Math.max(0, Math.min(999, parseInt(els.counterMax.value, 10) || 0));
+      els.counterMax.value = state.counterMax;
+      state.counterFuncName = els.counterFuncName.value.trim();
+      ({ frames, errors } = buildCounterFrames(els.script.value, state.cols, state.rows, state.counterMax, state.counterFuncName));
+    } else {
+      ({ frames, errors } = parseScript(els.script.value, state.cols, state.rows, state.template));
+    }
+    state.frames = frames;
+    state.current = 0;
+    els.errBox.textContent = errors.join('\n');
+    els.frameCount.textContent = state.counterMode
+      ? `${frames.length} passos no total (counter 0~${state.counterMax})`
+      : `${frames.length} quadros no total`;
+    paintFrame(0);
+  }
+
+  // ---------- dimension handling ----------
+  function applyDimensions(){
+    let c = parseInt(els.colsInput.value, 10);
+    let r = parseInt(els.rowsInput.value, 10);
+    if(!Number.isFinite(c) || c < 1) c = 1;
+    if(!Number.isFinite(r) || r < 1) r = 1;
+    c = Math.min(c, 32); r = Math.min(r, 32);
+    els.colsInput.value = c; els.rowsInput.value = r;
+    state.cols = c; state.rows = r;
+    buildGrid();
+    runParse();
+  }
+
+  // ---------- playback ----------
+  function stopPlayback(){
+    state.playing = false;
+    if(state.timer){ clearInterval(state.timer); state.timer = null; }
+    els.btnPlay.textContent = '▶ Reproduzir';
+  }
+
+  function startPlayback(){
+    if(state.frames.length < 2){ paintFrame(state.current); return; }
+    state.playing = true;
+    els.btnPlay.textContent = '❚❚ Pausar';
+    if(state.timer) clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      const last = state.frames.length - 1;
+      if(state.current >= last){
+        if(state.counterMode && !state.counterLoop){
+          stopPlayback();
+          return;
+        }
+        state.current = 0;
+      } else {
+        state.current++;
+      }
+      paintFrame(state.current);
+    }, state.speed);
+  }
+
+  function togglePlay(){
+    if(state.playing) stopPlayback();
+    else startPlayback();
+  }
+
+  function step(delta){
+    if(!state.frames.length) return;
+    stopPlayback();
+    state.current = (state.current + delta + state.frames.length) % state.frames.length;
+    paintFrame(state.current);
+  }
+
+  // ---------- events ----------
+  els.applyDims.addEventListener('click', applyDimensions);
+  els.colsInput.addEventListener('keydown', e => { if(e.key === 'Enter') applyDimensions(); });
+  els.rowsInput.addEventListener('keydown', e => { if(e.key === 'Enter') applyDimensions(); });
+
+  els.btnParse.addEventListener('click', runParse);
+  els.btnExample.addEventListener('click', () => {
+    els.script.value = state.counterMode
+      ? buildCounterExample(els.counterFuncName.value.trim() || 'ligar')
+      : EXAMPLE;
+    runParse();
+  });
+  els.btnClear.addEventListener('click', () => { els.script.value = ''; runParse(); });
+
+  function applyTemplate(){
+    state.template = els.templateInput.value;
+    runParse();
+  }
+  els.templateInput.addEventListener('change', applyTemplate);
+  els.templateInput.addEventListener('keydown', e => { if(e.key === 'Enter') applyTemplate(); });
+  els.templateReset.addEventListener('click', () => {
+    els.templateInput.value = DEFAULT_TEMPLATE;
+    applyTemplate();
+  });
+
+  function updateHelpText(){
+    if(state.counterMode){
+      const fn = els.counterFuncName.value.trim() || 'ligar';
+      els.helpBox.innerHTML =
+        '<b>Modo counter:</b> o script inteiro é executado como JS, avançando de counter=0 até o limite definido, passo a passo.<br>' +
+        `<b>Variáveis/funções disponíveis:</b> counter (contagem atual), cols e rows (dimensões atuais), <b>${fn}(linha, coluna)</b> (acende aquele LED; pode ser chamado várias vezes no mesmo passo).<br>` +
+        `<b>Como escrever:</b> use a sintaxe normal de JS, por exemplo if(counter&gt;5){${fn}(5,4);}. Também dá para usar laços for, variáveis etc.<br>` +
+        '<b>Nome da função:</b> troque o campo "Nome da função" para o identificador que preferir (ex.: acender, L) — o script passa a usar esse nome no lugar de ligar().<br>' +
+        '<b>Velocidade:</b> usa o mesmo controle deslizante de "Intervalo de reprodução" à esquerda — é o tempo entre cada avanço do counter.';
+    } else {
+      els.helpBox.innerHTML =
+        '<b>Sintaxe:</b> uma linha para cada <b>ligar(linha, coluna);</b>. Pode escrever várias linhas no mesmo quadro; linha e coluna começam em 1.<br>' +
+        '<b>Trocar de quadro:</b> separe quadros diferentes com uma linha em branco.<br>' +
+        '<b>Quadro em branco:</b> escreva <b>CLEAR;</b> sozinho em uma linha para apagar tudo nesse quadro (útil para efeito de piscar).<br>' +
+        '<b>Exemplo:</b> para acender a primeira e a segunda luz do canto superior esquerdo, escreva ligar(1, 1); e, na linha seguinte, ligar(1, 2);';
+    }
+  }
+
+  els.counterToggle.addEventListener('change', () => {
+    state.counterMode = els.counterToggle.checked;
+    els.counterExtra.classList.toggle('is-hidden', !state.counterMode);
+    els.templateRow.classList.toggle('is-hidden', state.counterMode);
+    updateHelpText();
+    runParse();
+  });
+  els.counterMax.addEventListener('change', runParse);
+  els.counterLoop.addEventListener('change', () => {
+    state.counterLoop = els.counterLoop.checked;
+  });
+  els.counterFuncName.addEventListener('change', () => { updateHelpText(); runParse(); });
+  els.counterFuncName.addEventListener('keydown', e => { if(e.key === 'Enter'){ updateHelpText(); runParse(); } });
+
+  els.btnPrev.addEventListener('click', () => step(-1));
+  els.btnNext.addEventListener('click', () => step(1));
+  els.btnPlay.addEventListener('click', togglePlay);
+  els.btnStop.addEventListener('click', () => { stopPlayback(); state.current = 0; paintFrame(0); });
+
+  els.speedRange.addEventListener('input', () => {
+    state.speed = parseInt(els.speedRange.value, 10);
+    els.speedVal.textContent = state.speed + ' ms';
+    if(state.playing) startPlayback();
+  });
+
+  // ---------- init ----------
+  els.speedVal.textContent = els.speedRange.value + ' ms';
+  buildGrid();
+  runParse();
+})();
+</script>
+</body>
+</html>

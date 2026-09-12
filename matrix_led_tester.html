@@ -328,6 +328,48 @@
   .counter-extra{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .counter-extra.is-hidden{ display:none; }
 
+  /* ---- simulated physical input ---- */
+  .input-toggle-wrap{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .input-switch{
+    position:relative;
+    width: 40px; height: 22px;
+    background: var(--led-off);
+    border: 1px solid var(--led-off-ring);
+    border-radius: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .input-switch::after{
+    content:"";
+    position:absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #5c5048;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .input-switch.on{
+    background: radial-gradient(circle at 35% 32%, #ffe3a8, var(--led-on) 55%, #b30f06 100%);
+    border-color: #ff6a52;
+    box-shadow: 0 0 8px 1px rgba(255,60,30,0.6);
+  }
+  .input-switch.on::after{
+    transform: translateX(18px);
+    background: #fff2ef;
+  }
+  .input-switch:focus-visible{ outline: 1px solid var(--amber); outline-offset: 2px; }
+  .input-value-label{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--amber);
+    min-width: 12px;
+  }
+
   /* ---- custom template ---- */
   .template-row{
     display:flex;
@@ -469,6 +511,13 @@
             <label>Contar até <input type="number" id="counterMax" min="0" max="999" value="10"></label>
             <label><input type="checkbox" id="counterLoop" checked> Repetir ao final</label>
             <label>Nome da função <input type="text" id="counterFuncName" value="ligar" spellcheck="false"></label>
+            <label>Nome do contador <input type="text" id="counterVarName" value="counter" spellcheck="false"></label>
+            <label>Nome da memória <input type="text" id="counterMemName" value="memoria" spellcheck="false"></label>
+            <label>Nome do input <input type="text" id="counterInputName" value="entrada" spellcheck="false"></label>
+            <div class="input-toggle-wrap">
+              <div class="input-switch" id="inputSwitch" role="switch" aria-checked="false" tabindex="0" title="Alternar o valor do input simulado (0/1)"></div>
+              <span class="input-value-label" id="inputValueLabel">0</span>
+            </div>
           </div>
         </div>
       </div>
@@ -480,11 +529,11 @@
 
       <div class="template-row" id="templateRow">
         <div class="template-row-top">
-          <label for="templateInput">Modelo de sintaxe</label>
+          <label for="templateInput">Modelo de coordenada</label>
           <input type="text" id="templateInput" value="ligar(%l, %c);" spellcheck="false">
           <button id="templateReset" class="ghost" title="Voltar ao modelo padrão">Padrão</button>
         </div>
-        <div class="template-hint">Use %l para a linha e %c para a coluna — ex.: L(%l);C(%c);</div>
+        <div class="template-hint" id="templateHint">Use %l para a linha e %c para a coluna — ex.: L(%l);C(%c);</div>
       </div>
 
       <textarea id="script" spellcheck="false"></textarea>
@@ -502,7 +551,7 @@
 
       <div class="help" id="helpBox">
 <b>Sintaxe:</b> uma linha para cada <b>ligar(linha, coluna);</b> (ou o modelo que você definir acima). Pode escrever várias linhas no mesmo quadro; linha e coluna começam em 1.<br>
-<b>Modelo personalizado:</b> mude o campo "Modelo de sintaxe" para o formato que preferir, usando %l no lugar da linha e %c no lugar da coluna — por exemplo L(%l);C(%c);<br>
+<b>Modelo personalizado:</b> mude o campo "Modelo de coordenada" acima para o formato que preferir, usando %l no lugar da linha e %c no lugar da coluna — por exemplo L(%l);C(%c);<br>
 <b>Trocar de quadro:</b> separe quadros diferentes com uma linha em branco.<br>
 <b>Quadro em branco:</b> escreva <b>CLEAR;</b> sozinho em uma linha para apagar tudo nesse quadro (útil para efeito de piscar).<br>
 <b>Exemplo:</b> para acender a primeira e a segunda luz do canto superior esquerdo, escreva ligar(1, 1); e, na linha seguinte, ligar(1, 2);
@@ -537,10 +586,16 @@
     counterMax: document.getElementById('counterMax'),
     counterLoop: document.getElementById('counterLoop'),
     counterFuncName: document.getElementById('counterFuncName'),
+    counterVarName: document.getElementById('counterVarName'),
+    counterMemName: document.getElementById('counterMemName'),
+    counterInputName: document.getElementById('counterInputName'),
+    inputSwitch: document.getElementById('inputSwitch'),
+    inputValueLabel: document.getElementById('inputValueLabel'),
     helpBox: document.getElementById('helpBox'),
     templateRow: document.getElementById('templateRow'),
     templateInput: document.getElementById('templateInput'),
     templateReset: document.getElementById('templateReset'),
+    templateHint: document.getElementById('templateHint'),
   };
 
   const DEFAULT_TEMPLATE = 'ligar(%l, %c);';
@@ -558,6 +613,10 @@
     counterMax: 10,
     counterLoop: true,
     counterFuncName: 'ligar',
+    counterVarName: 'counter',
+    counterMemName: 'memoria',
+    counterInputName: 'entrada',
+    inputValue: 0,
   };
 
   const EXAMPLE = [
@@ -574,14 +633,25 @@
     'CLEAR;',
   ].join('\n');
 
-  function buildCounterExample(fn){
+  function buildCounterExample(varName, fn, memName, inputName){
     return [
-      '// counter vai de 0 até o limite definido; este script roda de novo a cada passo',
-      'if(counter > 5){',
-      `  ${fn}(5, 4);`,
+      `// ${varName} vai de 0 até o limite definido; este script roda de novo a cada passo`,
+      `// ${memName} é um objeto que sobrevive entre os passos — use-o para guardar valores`,
+      `// ${inputName} é o input simulado (0 ou 1) que você liga/desliga no painel`,
+      `if(${memName}.piscadas === undefined){ ${memName}.piscadas = 0; }`,
+      '',
+      `if(${inputName} === 1){`,
+      `  ${fn}(1, 1);`,
+      '} else {',
+      `  ${fn}(7, 5);`,
       '}',
-      'if(counter % 2 === 0){',
-      `  ${fn}(1, counter % cols + 1);`,
+      '',
+      `if(${varName} > 5){`,
+      `  ${fn}(5, 4);`,
+      `  ${memName}.piscadas++;`,
+      '}',
+      `if(${varName} % 2 === 0){`,
+      `  ${fn}(1, ${varName} % cols + 1);`,
       '}',
     ].join('\n');
   }
@@ -617,10 +687,11 @@
       cell.classList.toggle('on', on.has(key));
     }
     const total = state.frames.length;
+    const cName = state.counterVarName || 'counter';
     if(!total){
-      els.frameStatus.innerHTML = state.counterMode ? 'counter 0 / 0' : 'quadro 0 / 0';
+      els.frameStatus.innerHTML = state.counterMode ? `${cName} 0 / 0` : 'quadro 0 / 0';
     } else if(state.counterMode){
-      els.frameStatus.innerHTML = `counter <b>${idx}</b> / ${state.counterMax}`;
+      els.frameStatus.innerHTML = `${cName} <b>${idx}</b> / ${state.counterMax}`;
     } else {
       els.frameStatus.innerHTML = `quadro <b>${idx+1}</b> / ${total}`;
     }
@@ -710,26 +781,69 @@
   }
 
   // ---------- counter mode ----------
-  const RESERVED_NAMES = ['counter', 'cols', 'rows'];
-
-  function validFuncName(name){
-    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !RESERVED_NAMES.includes(name);
+  function validIdentifier(name){
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name);
   }
 
-  function buildCounterFrames(text, cols, rows, max, fnName){
-    if(!fnName || !validFuncName(fnName)){
-      return { frames: [], errors: [`Nome de função inválido: "${fnName}". Use um identificador válido (letras, números, _ ou $, sem começar com número) e diferente de counter, cols ou rows.`] };
+  function validateCounterIdentifiers(varName, fnName, memName, inputName){
+    const named = [
+      ['contador', varName],
+      ['função', fnName],
+      ['memória', memName],
+      ['input', inputName],
+    ];
+    for(const [label, n] of named){
+      if(!validIdentifier(n)){
+        return `Nome de ${label} inválido: "${n}". Use letras, números, _ ou $, sem começar com número.`;
+      }
     }
+    const reserved = ['cols', 'rows'];
+    for(const [label, n] of named){
+      if(reserved.includes(n)){
+        return `"${n}" é reservado (cols/rows) e não pode ser usado como nome de ${label}.`;
+      }
+    }
+    const vals = named.map(([,n]) => n);
+    const dupe = vals.find((v, i) => vals.indexOf(v) !== i);
+    if(dupe){
+      return `Os nomes de contador, função, memória e input precisam ser diferentes entre si (repetido: "${dupe}").`;
+    }
+    return null;
+  }
+
+  // Substitui todas as ocorrências do modelo de coordenada (ex.: L(%l);C(%c);)
+  // por chamadas reais da função (ex.: ligar(3, 2);) antes de compilar o script.
+  function substituteTemplate(text, tpl, fnName){
+    const matcher = buildTemplateMatcher(tpl);
+    if(matcher.error) return { error: matcher.error };
+    const rowIdx = matcher.order.indexOf('l');
+    const colIdx = matcher.order.indexOf('c');
+    const regex = new RegExp(matcher.pattern, 'gi');
+    const processed = text.replace(regex, (...args) => {
+      const row = args[rowIdx + 1];
+      const col = args[colIdx + 1];
+      return `${fnName}(${row}, ${col});`;
+    });
+    return { text: processed, error: null };
+  }
+
+  function buildCounterFrames(text, cols, rows, max, fnName, varName, memName, inputName, inputValue, tpl){
+    const idErr = validateCounterIdentifiers(varName, fnName, memName, inputName);
+    if(idErr) return { frames: [], errors: [idErr] };
+
+    const sub = substituteTemplate(text, tpl, fnName);
+    if(sub.error) return { frames: [], errors: [sub.error] };
 
     let compiled;
     try{
-      compiled = new Function('counter', 'cols', 'rows', fnName, text);
+      compiled = new Function(varName, 'cols', 'rows', fnName, memName, inputName, sub.text);
     } catch(e){
       return { frames: [new Set()], errors: [`Erro de sintaxe no script: ${e.message}`] };
     }
 
     const frames = [];
     const errors = [];
+    const mem = {}; // persiste entre todos os passos deste cálculo (0..max)
     for(let i = 0; i <= max; i++){
       const on = new Set();
       const fn = (row, col) => {
@@ -737,13 +851,13 @@
         if(row >= 1 && row <= rows && col >= 1 && col <= cols){
           on.add(row + ',' + col);
         } else if(errors.length < 5){
-          errors.push(`counter=${i}: coordenada ${fnName}(${row}, ${col}); fora do intervalo (atual ${cols}×${rows})`);
+          errors.push(`${varName}=${i}: coordenada ${fnName}(${row}, ${col}); fora do intervalo (atual ${cols}×${rows})`);
         }
       };
       try{
-        compiled(i, cols, rows, fn);
+        compiled(i, cols, rows, fn, mem, inputValue);
       } catch(e){
-        if(errors.length < 5) errors.push(`counter=${i}: erro em tempo de execução - ${e.message}`);
+        if(errors.length < 5) errors.push(`${varName}=${i}: erro em tempo de execução - ${e.message}`);
       }
       frames.push(on);
     }
@@ -754,11 +868,19 @@
   function runParse(){
     stopPlayback();
     let frames, errors;
+    state.template = els.templateInput.value;
     if(state.counterMode){
       state.counterMax = Math.max(0, Math.min(999, parseInt(els.counterMax.value, 10) || 0));
       els.counterMax.value = state.counterMax;
       state.counterFuncName = els.counterFuncName.value.trim();
-      ({ frames, errors } = buildCounterFrames(els.script.value, state.cols, state.rows, state.counterMax, state.counterFuncName));
+      state.counterVarName = els.counterVarName.value.trim();
+      state.counterMemName = els.counterMemName.value.trim();
+      state.counterInputName = els.counterInputName.value.trim();
+      ({ frames, errors } = buildCounterFrames(
+        els.script.value, state.cols, state.rows, state.counterMax,
+        state.counterFuncName, state.counterVarName, state.counterMemName,
+        state.counterInputName, state.inputValue, state.template
+      ));
     } else {
       ({ frames, errors } = parseScript(els.script.value, state.cols, state.rows, state.template));
     }
@@ -766,7 +888,7 @@
     state.current = 0;
     els.errBox.textContent = errors.join('\n');
     els.frameCount.textContent = state.counterMode
-      ? `${frames.length} passos no total (counter 0~${state.counterMax})`
+      ? `${frames.length} passos no total (${state.counterVarName} 0~${state.counterMax})`
       : `${frames.length} quadros no total`;
     paintFrame(0);
   }
@@ -831,7 +953,12 @@
   els.btnParse.addEventListener('click', runParse);
   els.btnExample.addEventListener('click', () => {
     els.script.value = state.counterMode
-      ? buildCounterExample(els.counterFuncName.value.trim() || 'ligar')
+      ? buildCounterExample(
+          els.counterVarName.value.trim() || 'counter',
+          els.counterFuncName.value.trim() || 'ligar',
+          els.counterMemName.value.trim() || 'memoria',
+          els.counterInputName.value.trim() || 'entrada'
+        )
       : EXAMPLE;
     runParse();
   });
@@ -850,13 +977,18 @@
 
   function updateHelpText(){
     if(state.counterMode){
+      const varName = els.counterVarName.value.trim() || 'counter';
       const fn = els.counterFuncName.value.trim() || 'ligar';
+      const mem = els.counterMemName.value.trim() || 'memoria';
+      const inp = els.counterInputName.value.trim() || 'entrada';
       els.helpBox.innerHTML =
-        '<b>Modo counter:</b> o script inteiro é executado como JS, avançando de counter=0 até o limite definido, passo a passo.<br>' +
-        `<b>Variáveis/funções disponíveis:</b> counter (contagem atual), cols e rows (dimensões atuais), <b>${fn}(linha, coluna)</b> (acende aquele LED; pode ser chamado várias vezes no mesmo passo).<br>` +
-        `<b>Como escrever:</b> use a sintaxe normal de JS, por exemplo if(counter&gt;5){${fn}(5,4);}. Também dá para usar laços for, variáveis etc.<br>` +
-        '<b>Nome da função:</b> troque o campo "Nome da função" para o identificador que preferir (ex.: acender, L) — o script passa a usar esse nome no lugar de ligar().<br>' +
-        '<b>Velocidade:</b> usa o mesmo controle deslizante de "Intervalo de reprodução" à esquerda — é o tempo entre cada avanço do counter.';
+        `<b>Modo counter:</b> antes de executar, cada trecho que casa com o "Modelo de coordenada" acima é substituído por ${fn}(linha, coluna); depois disso, o script inteiro roda como JS, avançando de ${varName}=0 até o limite definido, passo a passo.<br>` +
+        `<b>Variáveis/funções disponíveis:</b> ${varName} (contagem atual), cols e rows (dimensões atuais), <b>${fn}(linha, coluna)</b> (acende aquele LED; pode ser chamado várias vezes no mesmo passo).<br>` +
+        `<b>Como escrever:</b> pode usar seu próprio formato de coordenada (configurado acima) misturado com JS normal, por exemplo if(${varName}&gt;5){L(5);C(4);}. Também dá para usar laços for, variáveis etc.<br>` +
+        `<b>Valores que persistem:</b> variáveis comuns (let/var) são reiniciadas a cada passo. Para guardar um valor entre os passos (equivalente a "static"), use o objeto <b>${mem}</b> — ex.: ${mem}.x = (${mem}.x || 0) + 1;<br>` +
+        `<b>Input simulado:</b> o interruptor abaixo representa uma entrada física (0 ou 1). O valor atual fica disponível no script como <b>${inp}</b> — ex.: if(${inp} === 1){ ${fn}(1,1); }. Clique no interruptor para alternar; o script é executado de novo automaticamente com o novo valor.<br>` +
+        '<b>Nomes personalizados:</b> troque os campos "Nome da função", "Nome do contador", "Nome da memória" e "Nome do input" para os identificadores que preferir.<br>' +
+        '<b>Velocidade:</b> usa o mesmo controle deslizante de "Intervalo de reprodução" à esquerda — é o tempo entre cada avanço do contador.';
     } else {
       els.helpBox.innerHTML =
         '<b>Sintaxe:</b> uma linha para cada <b>ligar(linha, coluna);</b>. Pode escrever várias linhas no mesmo quadro; linha e coluna começam em 1.<br>' +
@@ -866,10 +998,16 @@
     }
   }
 
+  function updateTemplateHint(){
+    els.templateHint.textContent = state.counterMode
+      ? 'Toda ocorrência desse padrão no script é substituída por uma chamada de função antes de executar — ex.: L(%l);C(%c); vira ligar(%l,%c);'
+      : 'Use %l para a linha e %c para a coluna — ex.: L(%l);C(%c);';
+  }
+
   els.counterToggle.addEventListener('change', () => {
     state.counterMode = els.counterToggle.checked;
     els.counterExtra.classList.toggle('is-hidden', !state.counterMode);
-    els.templateRow.classList.toggle('is-hidden', state.counterMode);
+    updateTemplateHint();
     updateHelpText();
     runParse();
   });
@@ -879,6 +1017,24 @@
   });
   els.counterFuncName.addEventListener('change', () => { updateHelpText(); runParse(); });
   els.counterFuncName.addEventListener('keydown', e => { if(e.key === 'Enter'){ updateHelpText(); runParse(); } });
+  els.counterVarName.addEventListener('change', () => { updateHelpText(); runParse(); });
+  els.counterVarName.addEventListener('keydown', e => { if(e.key === 'Enter'){ updateHelpText(); runParse(); } });
+  els.counterMemName.addEventListener('change', () => { updateHelpText(); runParse(); });
+  els.counterMemName.addEventListener('keydown', e => { if(e.key === 'Enter'){ updateHelpText(); runParse(); } });
+  els.counterInputName.addEventListener('change', () => { updateHelpText(); runParse(); });
+  els.counterInputName.addEventListener('keydown', e => { if(e.key === 'Enter'){ updateHelpText(); runParse(); } });
+
+  function toggleInputSwitch(){
+    state.inputValue = state.inputValue ? 0 : 1;
+    els.inputSwitch.classList.toggle('on', state.inputValue === 1);
+    els.inputSwitch.setAttribute('aria-checked', state.inputValue === 1 ? 'true' : 'false');
+    els.inputValueLabel.textContent = String(state.inputValue);
+    runParse();
+  }
+  els.inputSwitch.addEventListener('click', toggleInputSwitch);
+  els.inputSwitch.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleInputSwitch(); }
+  });
 
   els.btnPrev.addEventListener('click', () => step(-1));
   els.btnNext.addEventListener('click', () => step(1));
@@ -893,6 +1049,7 @@
 
   // ---------- init ----------
   els.speedVal.textContent = els.speedRange.value + ' ms';
+  updateTemplateHint();
   buildGrid();
   runParse();
 })();
